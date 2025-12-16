@@ -1,0 +1,340 @@
+--- 1 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 2 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 3 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 4 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 5 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 6 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 7 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 8 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 9 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`
+--- 10 ---
+Namespace(Dataset='IEMOCAP', batch_size=16, class_weight=True, dropout=0.5, epochs=150, hidden_dim=1024, l2=1e-05, lr=0.0001, n_head=8, no_cuda=False, temp=1, tensorboard=False)
+Running on GPU
+temp 1
+total parameters: 79687704
+training parameters: 79687704
+Traceback (most recent call last):
+  File "train.py", line 220, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 89, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 294, in forward
+    t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 167, in forward
+    x_b = self.transformer_inter[i](i, x_b, x_b, mask.eq(0))
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 137, in forward
+    context = self.self_attn(inputs_b, inputs_b, inputs_b, mask=mask)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 83, in forward
+    key = self.linear_k(key).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/linear.py", line 87, in forward
+    return F.linear(input, self.weight, self.bias)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/functional.py", line 1372, in linear
+    output = input.matmul(weight.t())
+RuntimeError: CUDA error: CUBLAS_STATUS_EXECUTION_FAILED when calling `cublasSgemm( handle, opa, opb, m, n, k, &alpha, a, lda, b, ldb, &beta, c, ldc)`

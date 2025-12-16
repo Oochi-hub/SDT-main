@@ -1,0 +1,210 @@
+--- 1 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([19, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 2 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([14, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 3 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([20, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 4 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([16, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 5 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([13, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 6 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([23, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 7 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([16, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 8 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([22, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 9 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([17, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
+--- 10 ---
+Namespace(Dataset='MELD', batch_size=8, class_weight=True, dropout=0.5, epochs=50, hidden_dim=1024, l2=1e-05, lr=5e-06, n_head=8, no_cuda=False, temp=8, tensorboard=False)
+Running on GPU
+temp 8
+total parameters: 78386204
+training parameters: 68949020
+textf: torch.Size([14, 8, 1024])
+Traceback (most recent call last):
+  File "train.py", line 221, in <module>
+    train_loss, train_acc, _, _, _, train_fscore = train_or_eval_model(model, loss_function, kl_loss, train_loader, e, optimizer, True)
+  File "train.py", line 90, in train_or_eval_model
+    kl_log_prob1, kl_log_prob2, kl_log_prob3, kl_all_prob = model(textf, visuf, acouf, umask, qmask, lengths)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/mnt/data1/oochi/SDT-main/model.py", line 289, in forward
+    textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/module.py", line 532, in __call__
+    result = self.forward(*input, **kwargs)
+  File "/home/oochi/.conda/envs/SDT/lib/python3.8/site-packages/torch/nn/modules/conv.py", line 201, in forward
+    return F.conv1d(input, self.weight, self.bias, self.stride,
+RuntimeError: cuDNN error: CUDNN_STATUS_MAPPING_ERROR
