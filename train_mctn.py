@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from dataloader import IEMOCAPDataset, MELDDataset
-from model import E2EHierarchicalMCTN, E2EParallelMCTN
+from model import E2EHierarchicalMCTN, E2EParallelMCTN, masked_contrastive_loss
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, accuracy_score, f1_score
 import pandas as pd
@@ -129,6 +129,36 @@ def plot_all(history, out_path):
               "Translation v2t Loss", "trans_v2t_loss.png")
     save_plot("train_v2a", "test_v2a", history, save_dir,\
               "Translation v2a Loss", "trans_v2a_loss.png")
+    
+    save_plot("train_trans", "test_trans", history, save_dir,\
+              "Translation Loss", "trans_loss.png")
+    
+    # parallel cycle
+    save_plot("train_cycle_t2a", "test_cycle_t2a", history, save_dir,\
+              "Cycle t2a Loss", "cycle_t2a_loss.png")
+    save_plot("train_cycle_t2v", "test_cycle_t2v", history, save_dir,\
+              "Cycle t2v Loss", "cycle_t2v_loss.png")
+
+    save_plot("train_cycle_a2t", "test_cycle_a2t", history, save_dir,\
+              "Cycle a2t Loss", "cycle_a2t_loss.png")
+    save_plot("train_cycle_a2v", "test_cycle_a2v", history, save_dir,\
+              "Cycle a2v Loss", "cycle_a2v_loss.png")
+    
+    save_plot("train_cycle_v2t", "test_cycle_v2t", history, save_dir,\
+              "Cycle v2t Loss", "cycle_v2t_loss.png")
+    save_plot("train_cycle_v2a", "test_cycle_v2a", history, save_dir,\
+              "Cycle v2a Loss", "cycle_v2a_loss.png")
+
+    
+    #contrasive loss
+    save_plot("train_cont", "test_cont", history, save_dir,\
+              "Contrasive Loss", "cont_loss.png")
+    save_plot("train_cont_ta", "test_cont_ta", history, save_dir,\
+              "Contrasive Text Audio Loss", "cont_ta_loss.png")
+    save_plot("train_cont_tv", "test_cont_tv", history, save_dir,\
+              "Contrasive Text Visual Loss", "cont_tv_loss.png")
+    save_plot("train_cont_av", "test_cont_av", history, save_dir,\
+              "Contrasive Audio Visual Loss", "cont_av_loss.png")
 
     # accuracy
     save_plot("train_acc", "test_acc", history, save_dir,\
@@ -153,7 +183,7 @@ def save_report_csv(labels, preds, names, out_path):
 
 #混同行列
 def make_cm(labels, preds, names, out_path):
-    os.makedirs(out_path + "/cm", exist_ok=True)
+    # os.makedirs(out_path + "/cm", exist_ok=True)
 
     cm = confusion_matrix(labels, preds)
     disp = ConfusionMatrixDisplay(cm, display_labels=names)
@@ -281,35 +311,24 @@ def train_or_eval_mctn(model, dataloader, optimizer=None, train=False, modal_seq
 
         out1, cycle_out, out2, cls = model(x)
 
-        mask = umask
-
-        # --- loss ---
-        # loss_trans1 = (mse(out1, target_1).mean(-1) * mask).sum() / mask.sum()
-        # loss_trans2 = (mse(out2, target_2).mean(-1) * mask).sum() / mask.sum()
-
-        # if model.is_cycled:
-        #     loss_cycle = (mse(cycle_out, x).mean(-1) * mask).sum() / mask.sum()
-        # else:
-        #     loss_cycle = torch.tensor(0.0).to(device)
-
         cls_flat = cls.view(-1, cls.size(-1))
         label_flat = label.view(-1)
 
-        # loss_cls = ce(cls_flat, label_flat)
-        # loss_cls = (loss_cls.view(mask.shape) * mask).sum() / mask.sum()
+        #翻訳損失
+        loss_trans1 = (mse(out1, target_1).mean(-1) * umask).mean()
+        loss_trans2 = (mse(out2, target_2).mean(-1) * umask).mean()
 
-        loss_trans1 = (mse(out1, target_1).mean(-1) * mask).mean()
-
-        loss_trans2 = (mse(out2, target_2).mean(-1) * mask).mean()
-
+        #逆翻訳損失
         if model.is_cycled:
-            loss_cycle = (mse(cycle_out, x).mean(-1) * mask).mean()
+            loss_cycle = (mse(cycle_out, x).mean(-1) * umask).mean()
         else:
-            loss_cycle = torch.tensor(0.0).to(device)
+            loss_cycle = torch.tensor(0.0).to(device) 
 
+        #分類損失
         loss_cls = ce(cls_flat, label_flat)
-        loss_cls = (loss_cls.view(mask.shape) * mask).mean()
+        loss_cls = (loss_cls.view(umask.shape) * umask).mean()
 
+        #全体の損失
         loss = (
             config["w_t1"] * loss_trans1 +
             config["w_t2"] * loss_trans2 +
@@ -322,14 +341,16 @@ def train_or_eval_mctn(model, dataloader, optimizer=None, train=False, modal_seq
             optimizer.step()
 
         pred = torch.argmax(cls, dim=-1)
-        pred = pred[mask == 1]
-        label_ = label[mask == 1]
+        pred = pred[umask == 1]
+        label_ = label[umask == 1]
 
         preds.append(pred.detach().cpu().numpy())
         labels.append(label_.detach().cpu().numpy())
 
+        #全体の損失，分類損失
         losses.append(loss.item())
         cls_losses.append(loss_cls.item())
+        #翻訳損失，逆翻訳損失
         trans1_losses.append(loss_trans1.item())
         trans2_losses.append(loss_trans2.item())
         cycle_losses.append(loss_cycle.item())
@@ -338,24 +359,33 @@ def train_or_eval_mctn(model, dataloader, optimizer=None, train=False, modal_seq
     labels = np.concatenate(labels)
 
     return (
-        np.mean(losses),
-        np.mean(cls_losses),
-        np.mean(trans1_losses),
-        np.mean(trans2_losses),
-        np.mean(cycle_losses),
+        np.mean(losses),        #モデル全体の損失
+        np.mean(cls_losses),    #分類損失
+        np.mean(trans1_losses), #第一翻訳損失
+        np.mean(trans2_losses), #第二翻訳損失
+        np.mean(cycle_losses),  #第一逆翻訳損失
         accuracy_score(labels, preds) * 100,
         f1_score(labels, preds, average='weighted') * 100,
         labels, preds
     )
 
-def train_or_eval_mctn_2(model, dataloader, optimizer=None, train=False, modal=None):
+def train_or_eval_mctn_2(model, dataloader, optimizer=None, train=False, modal=None, const_flag=False, tau=1.00, is_cycle=True):
 
     losses = []
     cls_losses = []
-    transt2a_losses, transt2v_losses = [], []
-    transa2t_losses, transa2v_losses = [], []
-    transv2t_losses, transv2a_losses = [], []
+    trans_losses = []
+    trans_t2a_losses, trans_t2v_losses = [], []
+    trans_a2t_losses, trans_a2v_losses = [], []
+    trans_v2t_losses, trans_v2a_losses = [], []
     preds, labels = [], []
+
+    const_ta_losses, const_tv_losses, const_av_losses = [], [], []
+    const_losses = []
+
+    cycle_losses = []
+    cycle_t2a_losses, cycle_t2v_losses = [], []
+    cycle_a2t_losses, cycle_a2v_losses = [], []
+    cycle_v2t_losses, cycle_v2a_losses = [], []
 
     device = next(model.parameters()).device
 
@@ -376,55 +406,109 @@ def train_or_eval_mctn_2(model, dataloader, optimizer=None, train=False, modal=N
         acouf = acouf.permute(1, 0, 2)
         visuf = visuf.permute(1, 0, 2)
 
-        out_t2a, out_t2v, out_a2t, out_a2v, out_v2t, out_v2a, cls = model(textf, acouf, visuf, modal)
+        out_t2a, out_t2v, out_a2t, out_a2v, out_v2t, out_v2a, \
+        cls, enc_t, enc_a, enc_v, \
+        cycle_t2a, cycle_t2v, cycle_a2t, cycle_a2v, cycle_v2t, cycle_v2a = model(textf, acouf, visuf, modal, is_cycle)
 
-        mask = umask
 
         # --- class loss ---
         cls_flat = cls.view(-1, cls.size(-1))
         label_flat = label.view(-1)
         loss_cls = ce(cls_flat, label_flat)
-        loss_cls = (loss_cls.view(mask.shape) * mask).mean()
+        loss_cls = (loss_cls.view(umask.shape) * umask).mean()
 
         # --- trans loss ---
         ##text 2 other
-        loss_trans_t2a = (mse(out_t2a, acouf).mean(-1) * mask).mean()
-        loss_trans_t2v = (mse(out_t2v, visuf).mean(-1) * mask).mean()
-
+        loss_trans_t2a = (mse(out_t2a, acouf).mean(-1) * umask).mean()
+        loss_trans_t2v = (mse(out_t2v, visuf).mean(-1) * umask).mean()
         ##audio 2 other
-        loss_trans_a2t = (mse(out_a2t, textf).mean(-1) * mask).mean()
-        loss_trans_a2v = (mse(out_a2v, visuf).mean(-1) * mask).mean()
-
+        loss_trans_a2t = (mse(out_a2t, textf).mean(-1) * umask).mean()
+        loss_trans_a2v = (mse(out_a2v, visuf).mean(-1) * umask).mean()
         ##visual 2 other
-        loss_trans_v2t = (mse(out_v2t, textf).mean(-1) * mask).mean()
-        loss_trans_v2a = (mse(out_v2a, acouf).mean(-1) * mask).mean()
+        loss_trans_v2t = (mse(out_v2t, textf).mean(-1) * umask).mean()
+        loss_trans_v2a = (mse(out_v2a, acouf).mean(-1) * umask).mean()
 
-        loss = (
-            0.1 * (loss_trans_t2a + loss_trans_t2v 
+        loss_trans = (loss_trans_t2a + loss_trans_t2v 
                    + loss_trans_a2t + loss_trans_a2v 
-                   + loss_trans_v2t + loss_trans_v2a) / 6 +
-            1.0 * loss_cls
-        )
+                   + loss_trans_v2t + loss_trans_v2a) / 6
+
+        #損失の合計
+        loss = (0.1 * loss_trans + 1.0 * loss_cls)
+
+        # --- constract loss ---
+        if const_flag:
+            loss_cont_ta = masked_contrastive_loss(enc_t,enc_a,umask,tau)
+            loss_cont_tv = masked_contrastive_loss(enc_t,enc_v,umask,tau)
+            loss_cont_av = masked_contrastive_loss(enc_a,enc_v,umask,tau)
+
+            loss_cont = (loss_cont_ta + loss_cont_tv + loss_cont_av) / 3
+            loss += 0.1 * loss_cont
+
+        # --- cycle loss ---
+        if is_cycle:
+            ##text 2 other
+            loss_cycle_t2a = (mse(cycle_t2a, textf).mean(-1) * umask).mean()
+            loss_cycle_t2v = (mse(cycle_t2v, textf).mean(-1) * umask).mean()
+            ##audio 2 other
+            loss_cycle_a2t = (mse(cycle_a2t, acouf).mean(-1) * umask).mean()
+            loss_cycle_a2v = (mse(cycle_a2v, acouf).mean(-1) * umask).mean()
+            ##visual 2 other
+            loss_cycle_v2t = (mse(cycle_v2t, visuf).mean(-1) * umask).mean()
+            loss_cycle_v2a = (mse(cycle_v2a, visuf).mean(-1) * umask).mean()
+
+            loss_cycle = (loss_cycle_t2a + loss_cycle_t2v 
+                   + loss_cycle_a2t + loss_cycle_a2v 
+                   + loss_cycle_v2t + loss_cycle_v2a) / 6  
+
+            loss += 0.1 * loss_cycle    
 
         if train:
             loss.backward()
             optimizer.step()
 
         pred = torch.argmax(cls, dim=-1)
-        pred = pred[mask == 1]
-        label_ = label[mask == 1]
-
+        pred = pred[umask == 1]
+        label_ = label[umask == 1]
         preds.append(pred.detach().cpu().numpy())
         labels.append(label_.detach().cpu().numpy())
 
         losses.append(loss.item())
         cls_losses.append(loss_cls.item())
-        transt2a_losses.append(loss_trans_t2a.item())
-        transt2v_losses.append(loss_trans_t2v.item())
-        transa2t_losses.append(loss_trans_a2t.item())
-        transa2v_losses.append(loss_trans_a2v.item())
-        transv2t_losses.append(loss_trans_v2t.item())
-        transv2a_losses.append(loss_trans_v2a.item())
+
+        trans_losses.append(loss_trans.item())
+        trans_t2a_losses.append(loss_trans_t2a.item())
+        trans_t2v_losses.append(loss_trans_t2v.item())
+        trans_a2t_losses.append(loss_trans_a2t.item())
+        trans_a2v_losses.append(loss_trans_a2v.item())
+        trans_v2t_losses.append(loss_trans_v2t.item())
+        trans_v2a_losses.append(loss_trans_v2a.item())
+        if const_flag:
+            const_ta_losses.append(loss_cont_ta.item())
+            const_tv_losses.append(loss_cont_tv.item())
+            const_av_losses.append(loss_cont_av.item())
+            const_losses.append(loss_cont.item())
+        else:
+            const_ta_losses.append(0)
+            const_tv_losses.append(0)
+            const_av_losses.append(0)
+            const_losses.append(0)
+        if is_cycle:
+            cycle_losses.append(loss_cycle.item())
+            cycle_t2a_losses.append(loss_cycle_t2a.item())
+            cycle_t2v_losses.append(loss_cycle_t2v.item())
+            cycle_a2t_losses.append(loss_cycle_a2t.item())
+            cycle_a2v_losses.append(loss_cycle_a2v.item())
+            cycle_v2t_losses.append(loss_cycle_v2t.item())
+            cycle_v2a_losses.append(loss_cycle_v2a.item())
+        else:
+            cycle_losses.append(0)
+            cycle_t2a_losses.append(0)
+            cycle_t2v_losses.append(0)
+            cycle_a2t_losses.append(0)
+            cycle_a2v_losses.append(0)
+            cycle_v2t_losses.append(0)
+            cycle_v2a_losses.append(0)
+
     
     preds = np.concatenate(preds)
     labels = np.concatenate(labels)
@@ -432,12 +516,24 @@ def train_or_eval_mctn_2(model, dataloader, optimizer=None, train=False, modal=N
     return (
         np.mean(losses),           #モデル全体の損失
         np.mean(cls_losses),       #分類損失
-        np.mean(transt2a_losses),  #t2a 翻訳損失
-        np.mean(transt2v_losses),  #t2v 翻訳損失
-        np.mean(transa2t_losses),  #a2t 翻訳損失
-        np.mean(transa2v_losses),  #a2v 翻訳損失
-        np.mean(transv2t_losses),  #v2t 翻訳損失
-        np.mean(transv2a_losses),  #v2a 翻訳損失
+        np.mean(trans_losses),     #翻訳損失
+        np.mean(trans_t2a_losses), #t2a 翻訳損失
+        np.mean(trans_t2v_losses), #t2v 翻訳損失
+        np.mean(trans_a2t_losses), #a2t 翻訳損失
+        np.mean(trans_a2v_losses), #a2v 翻訳損失
+        np.mean(trans_v2t_losses), #v2t 翻訳損失
+        np.mean(trans_v2a_losses), #v2a 翻訳損失
+        np.mean(const_losses),     #対照損失
+        np.mean(const_ta_losses),  #t,a 対照損失
+        np.mean(const_tv_losses),  #t,v 対照損失
+        np.mean(const_av_losses),  #a,v 対照損失
+        np.mean(cycle_losses),     #逆翻訳損失
+        np.mean(cycle_t2a_losses), #t2a 逆翻訳損失
+        np.mean(cycle_t2v_losses), #t2v 逆翻訳損失
+        np.mean(cycle_a2t_losses), #a2t 逆翻訳損失
+        np.mean(cycle_a2v_losses), #a2v 逆翻訳損失
+        np.mean(cycle_v2t_losses), #v2t 逆翻訳損失
+        np.mean(cycle_v2a_losses), #v2a 逆翻訳損失
         accuracy_score(labels, preds) * 100,
         f1_score(labels, preds, average='weighted') * 100,
         labels, preds
@@ -449,23 +545,25 @@ def count_trainable_params(model):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
-    # ===== 必須のみ =====
+    # ===== 引数 =====
     parser.add_argument('--no-cuda', action='store_true', default=False)
     parser.add_argument('--lr', type=float, default=0.0001)
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--hidden_dim', type=int, default=1024)
     parser.add_argument('--epochs', type=int, default=200)
+    parser.add_argument('--tau', type=float, default=1.00)
     parser.add_argument('--Dataset', default='IEMOCAP')
     parser.add_argument('--out_path', default='demo')
     parser.add_argument('--valid_num', type=int, default=0)
-    parser.add_argument('--modal_seq', type=str, default="TAV",
-                    help="modality order, e.g. TAV, TVA, ATV...")
+    parser.add_argument('--modal_seq', type=str, default="TAV", help="modality order, if 階層型 e.g. TAV, ATV..., if 並列型 e.g T, A, V")
     parser.add_argument('--model_type', type=str)
+    parser.add_argument('--const_flag', default=False)
+    parser.add_argument('--is_cycle', default=False)
 
     args = parser.parse_args()
+    params_save_to_csv(vars(args), args.out_path) #引数の保存
 
-    params_save_to_csv(vars(args), args.out_path)
-
+    #cudaの確認
     args.cuda = torch.cuda.is_available() and not args.no_cuda
     device = torch.device("cuda" if args.cuda else "cpu")
 
@@ -488,6 +586,7 @@ if __name__ == '__main__':
     "A": 1582   # audio
     }
 
+    #ソース，ターゲットモダリティの設定
     seq = args.modal_seq.upper()
 
     # ===== モデル =====
@@ -533,94 +632,134 @@ if __name__ == '__main__':
 
     best_acc = 0
 
+    #損失保存用
     history = {
         "train_loss": [], "test_loss": [],
         "train_cls": [], "test_cls": [],
+
         "train_t1": [], "test_t1": [],
         "train_t2": [], "test_t2": [],
         "train_cycle": [], "test_cycle": [],
+
         "train_acc": [], "test_acc": [],
         "train_f1": [], "test_f1": [],
+
+        "train_trans": [], "test_trans": [],
         "train_t2a": [], "test_t2a": [],
         "train_t2v": [], "test_t2v": [],
         "train_a2t": [], "test_a2t": [],
         "train_a2v": [], "test_a2v": [],
         "train_v2t": [], "test_v2t": [],
         "train_v2a": [], "test_v2a": [],
+
+        "train_cont": [], "test_cont": [],
+        "train_cont_ta": [], "test_cont_ta": [],
+        "train_cont_tv": [], "test_cont_tv": [],
+        "train_cont_av": [], "test_cont_av": [],
+
+        "train_cycle_t2a": [], "test_cycle_t2a": [],
+        "train_cycle_t2v": [], "test_cycle_t2v": [],
+        "train_cycle_a2t": [], "test_cycle_a2t": [],
+        "train_cycle_a2v": [], "test_cycle_a2v": [],
+        "train_cycle_v2t": [], "test_cycle_v2t": [],
+        "train_cycle_v2a": [], "test_cycle_v2a": [],
     }
 
     # ===== 学習 =====
-    start_time = time.time()
+    start_time = time.time() #総学習時間計測開始
     for e in range(n_epochs):
-        epoch_time = time.time()
+        epoch_time = time.time() #各エポック学習時間計測開始
 
-        if args.model_type=="hieral":
+        if args.model_type=="hieral": #階層型学習
+            #学習
             train_loss, train_cls, train_t1, train_t2, train_cycle, train_acc, train_f1, _, _ = \
                 train_or_eval_mctn(model, train_loader, optimizer, True, seq)
-
+            #検証
             test_loss, test_cls, test_t1, test_t2, test_cycle, test_acc, test_f1, labels, preds = \
                 train_or_eval_mctn(model, test_loader, None, False, seq)
 
-            # 保存
-            history["train_loss"].append(train_loss)
-            history["test_loss"].append(test_loss)
-            history["train_cls"].append(train_cls)
-            history["test_cls"].append(test_cls)
-            history["train_t1"].append(train_t1)
-            history["test_t1"].append(test_t1)
-            history["train_t2"].append(train_t2)
-            history["test_t2"].append(test_t2)
-            history["train_cycle"].append(train_cycle)
-            history["test_cycle"].append(test_cycle)
-            history["train_acc"].append(train_acc)
-            history["test_acc"].append(test_acc)
-            history["train_f1"].append(train_f1)
-            history["test_f1"].append(test_f1)
+            # 損失保存
+            ##合計，分類損失
+            history["train_loss"].append(train_loss), history["test_loss"].append(test_loss)
+            history["train_cls"].append(train_cls), history["test_cls"].append(test_cls)
+
+            #変換損失
+            history["train_t1"].append(train_t1), history["test_t1"].append(test_t1)
+            history["train_t2"].append(train_t2), history["test_t2"].append(test_t2)
+            #自己回帰変換損失
+            history["train_cycle"].append(train_cycle), history["test_cycle"].append(test_cycle)
+
+            #Acc.，F値
+            history["train_acc"].append(train_acc), history["test_acc"].append(test_acc)
+            history["train_f1"].append(train_f1), history["test_f1"].append(test_f1)
         
-        elif args.model_type=="parallel":
-            train_loss, train_cls, train_t2a, train_t2v, train_a2t, train_a2v, train_v2t, train_v2a, train_acc, train_f1, _, _ = \
-                train_or_eval_mctn_2(model, train_loader, optimizer, True, seq[0])
+        elif args.model_type=="parallel": #並列型学習
 
-            test_loss, test_cls, test_t2a, test_t2v, test_a2t, test_a2v, test_v2t, test_v2a, test_acc, test_f1, labels, preds = \
-                train_or_eval_mctn_2(model, test_loader, None, False, seq[0])
+            #対照学習設定
+            const_flag = args.const_flag
+            tau = args.tau
+            #自己回帰変換
+            is_cycle = args.tau
 
-            # 保存
-            history["train_loss"].append(train_loss)
-            history["test_loss"].append(test_loss)
-            history["train_cls"].append(train_cls)
-            history["test_cls"].append(test_cls)
+            #学習
+            train_loss, train_cls, \
+            train_trans, train_t2a, train_t2v, train_a2t, train_a2v, train_v2t, train_v2a, \
+            train_cont, train_cont_ta, train_cont_tv, train_cont_av, \
+            train_cycle, train_cycle_t2a, train_cycle_t2v, train_cycle_a2t, train_cycle_a2v, train_cycle_v2t, train_cycle_v2a, \
+            train_acc, train_f1, _, _ = \
+                train_or_eval_mctn_2(model, train_loader, optimizer, True, seq[0], const_flag, tau, is_cycle)
 
-            ##翻訳損失
-            history["train_t2a"].append(train_t2a)
-            history["test_t2a"].append(test_t2a)
+            #検証
+            test_loss, test_cls, \
+            test_trans, test_t2a, test_t2v, test_a2t, test_a2v, test_v2t, test_v2a, \
+            test_cont, test_cont_ta, test_cont_tv, test_cont_av, \
+            test_cycle, test_cycle_t2a, test_cycle_t2v, test_cycle_a2t, test_cycle_a2v, test_cycle_v2t, test_cycle_v2a, \
+            test_acc, test_f1, labels, preds = \
+                train_or_eval_mctn_2(model, test_loader, None, False, seq[0], const_flag, tau, is_cycle)
 
-            history["train_t2v"].append(train_t2v)
-            history["test_t2v"].append(test_t2v)
+            # 損失保存
+            ##合計，分類損失
+            history["train_loss"].append(train_loss), history["test_loss"].append(test_loss)
+            history["train_cls"].append(train_cls), history["test_cls"].append(test_cls)
 
-            history["train_a2t"].append(train_a2t)
-            history["test_a2t"].append(test_a2t)
+            ##変換損失
+            history["train_trans"].append(train_trans), history["test_trans"].append(test_trans)
+            history["train_t2a"].append(train_t2a), history["test_t2a"].append(test_t2a)
+            history["train_t2v"].append(train_t2v), history["test_t2v"].append(test_t2v)
+            history["train_a2t"].append(train_a2t), history["test_a2t"].append(test_a2t)
+            history["train_a2v"].append(train_a2v), history["test_a2v"].append(test_a2v)
+            history["train_v2t"].append(train_v2t), history["test_v2t"].append(test_v2t)
+            history["train_v2a"].append(train_v2a), history["test_v2a"].append(test_v2a)
 
-            history["train_a2v"].append(train_a2v)
-            history["test_a2v"].append(test_a2v)
+            #対照損失
+            history["train_cont"].append(train_cont), history["test_cont"].append(test_cont)
+            history["train_cont_ta"].append(train_cont_ta), history["test_cont_ta"].append(test_cont_ta)
+            history["train_cont_tv"].append(train_cont_tv), history["test_cont_tv"].append(test_cont_tv)
+            history["train_cont_av"].append(train_cont_av), history["test_cont_av"].append(test_cont_av)
 
-            history["train_v2t"].append(train_v2t)
-            history["test_v2t"].append(test_v2t)
+            ##自己回帰 変換損失
+            history["train_cycle"].append(train_cycle), history["test_cycle"].append(test_cycle)
+            history["train_cycle_t2a"].append(train_cycle_t2a), history["test_cycle_t2a"].append(test_cycle_t2a)
+            history["train_cycle_t2v"].append(train_cycle_t2v), history["test_cycle_t2v"].append(test_cycle_t2v)
+            history["train_cycle_a2t"].append(train_cycle_a2t), history["test_cycle_a2t"].append(test_cycle_a2t)
+            history["train_cycle_a2v"].append(train_cycle_a2v), history["test_cycle_a2v"].append(test_cycle_a2v)
+            history["train_cycle_v2t"].append(train_cycle_v2t), history["test_cycle_v2t"].append(test_cycle_v2t)
+            history["train_cycle_v2a"].append(train_cycle_v2a), history["test_cycle_v2a"].append(test_cycle_v2a)
 
-            history["train_v2a"].append(train_v2a)
-            history["test_v2a"].append(test_v2a)
+            #Acc.，F値
+            history["train_acc"].append(train_acc), history["test_acc"].append(test_acc)
+            history["train_f1"].append(train_f1), history["test_f1"].append(test_f1)
 
-            history["train_acc"].append(train_acc)
-            history["test_acc"].append(test_acc)
-            history["train_f1"].append(train_f1)
-            history["test_f1"].append(test_f1)
-
+        #最良モデル更新
         if test_acc > best_acc:
             best_acc = test_acc
             torch.save(model.state_dict(), args.out_path + "/best_mctn.pth")
 
+        #各エポック結果を表示
         print(f"epoch: {e+1}, train_loss: {train_loss:.4f}, "
               f"train_acc: {train_acc:.2f}, test_acc: {test_acc:.2f}, "
               f"time: {round(time.time()-epoch_time,2)} sec")
+        
     #学習時間を表示
     print("\n===== 学習時間 =====")
     elapsed = time.time() - start_time
@@ -631,18 +770,26 @@ if __name__ == '__main__':
 
     # ===== best model評価 =====
     print("\n===== Best Model Evaluation =====")
-
-
+    #最良モデルを読み込む
     model.load_state_dict(torch.load(args.out_path + "/best_mctn.pth"))
     model.eval()
 
+    #最良モデルテスト
     if args.model_type=="hieral":
         test_loss, test_cls, test_t1, test_t2, test_cycle, test_acc, test_f1, labels, preds = \
             train_or_eval_mctn(model, test_loader, None, False, seq)
     elif args.model_type=="parallel":
-        test_loss, test_cls, test_t2a, test_t2v, test_a2t, test_a2v, test_v2t, test_v2a, test_acc, test_f1, labels, preds = \
-            train_or_eval_mctn_2(model, test_loader, None, False, seq[0])
+        const_flag = args.const_flag
+        tau = args.tau
+        is_cycle = args.is_cycle
 
+        test_loss, test_cls, \
+        test_trans, test_t2a, test_t2v, test_a2t, test_a2v, test_v2t, test_v2a, \
+        test_cont, test_cont_ta, test_cont_tv, test_cont_av, \
+        test_cycle, test_cycle_t2a, test_cycle_t2v, test_cycle_a2t, test_cycle_a2v, test_cycle_v2t, test_cycle_v2a, \
+        test_acc, test_f1, labels, preds = \
+            train_or_eval_mctn_2(model, test_loader, None, False, seq[0], const_flag, tau, is_cycle)
+    #最良モデルテスト結果表示
     print(f"Best Test Accuracy: {test_acc:.2f}")
     print(f"Best Test F1-score: {test_f1:.2f}")
 
@@ -652,8 +799,8 @@ if __name__ == '__main__':
     else:
         target_names = ['neutral', 'surprise', 'fear', 'sadness', 'joy', 'disgust', 'anger']
 
-    plot_all(history, args.out_path)
-    save_report_csv(labels, preds, target_names, args.out_path)
-    make_cm(labels, preds, target_names, args.out_path)
-    csv_history(history, args.out_path)
+    plot_all(history, args.out_path) #学習曲線
+    save_report_csv(labels, preds, target_names, args.out_path) #各ラベル分類精度記録
+    make_cm(labels, preds, target_names, args.out_path) #混同行列
+    csv_history(history, args.out_path) #各エポックの損失
 

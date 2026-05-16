@@ -23,13 +23,8 @@ class MaskedKLDivLoss(nn.Module):
         masked_loss = (losses.sum(dim=1)) * mask.view(-1).float()  # sum over classes, then mask
         # print("KL損失")
         # print(masked_loss)
-        return masked_loss.sum()
-        #return masked_loss.sum() / mask.sum()
-    
-        # loss = self.loss(log_pred, target)  # shape: [batch, classes]
-        # mask = mask.view(-1, 1).float()
-        # loss = loss * mask
-        # return loss.sum() / mask.sum()
+        #return masked_loss.sum()
+        return masked_loss.sum() / mask.sum()
 
 #モダリティマスク KL損失
 class MaskedKLDivLoss_2(nn.Module):
@@ -65,16 +60,6 @@ class MaskedNLLLoss(nn.Module):
         super(MaskedNLLLoss, self).__init__()
         self.weight = weight
         self.loss = nn.NLLLoss(weight=weight, reduction='sum')
-
-    # def forward(self, pred, target, mask):
-    #     """
-    #     pred: shape (batch_size, num_classes) → log-probabilities
-    #     target: shape (batch_size,) → class indices
-    #     mask: shape (batch_size,) → 0 or 1
-    #     """
-    #     losses = F.nll_loss(pred, target, weight=self.weight, reduction='none')  # shape: [B]
-    #     masked_loss = losses * mask.view(-1).float()
-    #     return masked_loss.sum() / mask.sum()
 
     def forward(self, pred, target, mask):
         mask_ = mask.view(-1, 1)
@@ -115,7 +100,8 @@ class MaskedNLLLoss_2(nn.Module):
         loss = ce_masked.sum() / (mask_flat.sum() + self.eps)
 
         return loss
-    
+
+#ワッシャーシュタイン距離損失
 class WassersteinLoss(nn.Module):
     def __init__(self, M, reg=0.025, num_epoch=300):
         """
@@ -180,7 +166,8 @@ class WassersteinLoss(nn.Module):
         loss = masked_loss.sum() / (mask_flat.sum() + 1e-16)
 
         return loss
-    
+
+#ワシャーシュタイン関数にlogを適応   
 class LogWassersteinLoss(nn.Module):
     def __init__(self, M, reg=0.005, num_epoch=300):
         """
@@ -238,6 +225,7 @@ class LogWassersteinLoss(nn.Module):
 
         return loss    
 
+#gelu関数
 def gelu(x):
     return 0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) * (x + 0.044715 * torch.pow(x, 3))))
 
@@ -291,6 +279,12 @@ class MultiHeadedAttention(nn.Module):
         value = self.linear_v(value).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
         query = self.linear_q(query).view(batch_size, -1, head_count, dim_per_head).transpose(1, 2)
 
+        # #12/23
+        # print("query: ", query.shape)
+        # print("key: ", key.shape)
+        # print("value: ", value.shape)
+        # exit()
+
         query = query / math.sqrt(dim_per_head)
         scores = torch.matmul(query, key.transpose(2, 3))
 
@@ -305,7 +299,7 @@ class MultiHeadedAttention(nn.Module):
         output = self.linear(context)
         return output
 
-
+#位置埋め込み
 class PositionalEncoding(nn.Module):
     def __init__(self, dim, max_len=512):
         super(PositionalEncoding, self).__init__()
@@ -434,11 +428,20 @@ class Multimodal_GatedFusion(nn.Module):
         utters = torch.cat([a_new, b_new, c_new], dim=-2)
         utters_fc = torch.cat([self.fc(a).unsqueeze(-2), self.fc(b).unsqueeze(-2), self.fc(c).unsqueeze(-2)], dim=-2)
         utters_softmax = self.softmax(utters_fc)
+
+
         utters_three_model = utters_softmax * utters
         final_rep = torch.sum(utters_three_model, dim=-2, keepdim=False)
-        return final_rep
 
+        #12/28 gate fusion softmax分布調査用
+        return final_rep, utters_softmax
 
+        # print("utters: ", utters.shape)
+        # print("utters_fc: ", utters_fc.shape)
+        # print("utter_softmax: ", utters_softmax.shape)
+        # print("utters_three_model: ", utters_three_model.shape)
+        # print("final_rep: ",  final_rep.shape)
+        # exit()
 
 class Transformer_Based_Model(nn.Module):
     def __init__(self, dataset, temp, D_text, D_visual, D_audio, n_head,
@@ -621,7 +624,7 @@ class Transformer_Based_Model(nn.Module):
         v_transformer_out = self.features_reduce_v(torch.cat([v_v_transformer_out, t_v_transformer_out, a_v_transformer_out], dim=-1))
 
         # Multimodal-level Gated Fusion
-        all_transformer_out = self.last_gate(t_transformer_out, a_transformer_out, v_transformer_out)
+        all_transformer_out, soft_max_gate_fusion = self.last_gate(t_transformer_out, a_transformer_out, v_transformer_out)
 
 
         # Emotion Classifier
@@ -663,9 +666,9 @@ class Transformer_Based_Model(nn.Module):
                ws_t_prob, ws_a_prob, ws_v_prob, ws_all_prob, \
                t_prob, a_prob, v_prob
 
-#9/16 各モダリティ表現の分類性能，正解，不正解事例の分析用        
+#単一入力モデル     
 class Single_Modal_Transformer_Based_Model(nn.Module):
-    def __init__(self, dataset, temp, D_text, D_visual, D_audio, n_head,
+    def __init__(self, dataset, temp, D_input, n_head,
                  n_classes, hidden_dim, n_speakers, dropout, demo_charaID_flag=False):
         super(Single_Modal_Transformer_Based_Model, self).__init__()
         self.temp = temp
@@ -685,46 +688,15 @@ class Single_Modal_Transformer_Based_Model(nn.Module):
                 padding_idx = 9
         # #各特徴量と同じ次元の埋め込みベクトルを用意
         self.speaker_embeddings = nn.Embedding(n_speakers+1, hidden_dim, padding_idx)
-
-        #9/7 モダリティごとに埋め込みを行う
-        #各特徴量と同じ次元の埋め込みベクトルを用意
-        # self.speaker_embeddings_t = nn.Embedding(n_speakers+1, hidden_dim, padding_idx)
-        # self.speaker_embeddings_a = nn.Embedding(n_speakers+1, hidden_dim, padding_idx)
-        # self.speaker_embeddings_v = nn.Embedding(n_speakers+1, hidden_dim, padding_idx)
-        
-
         
         # Temporal convolutional layers
-        self.textf_input = nn.Conv1d(D_text, hidden_dim, kernel_size=1, padding=0, bias=False)
-        self.acouf_input = nn.Conv1d(D_audio, hidden_dim, kernel_size=1, padding=0, bias=False)
-        self.visuf_input = nn.Conv1d(D_visual, hidden_dim, kernel_size=1, padding=0, bias=False)
+        self._input = nn.Conv1d(D_input, hidden_dim, kernel_size=1, padding=0, bias=False)
         
-
-        # Intra- and Inter-modal Transformers
+        # Intra-modal Transformers
         self.x_x = TransformerEncoder(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        self.y_x = TransformerEncoder(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        self.z_x = TransformerEncoder(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
 
-
-        #9/7 モダリティごと埋め込み用
-        # self.t_t = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.a_t = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.v_t = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-
-        # self.a_a = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.t_a = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.v_a = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-
-        # self.v_v = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.t_v = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        # self.a_v = TransformerEncoder_2(d_model=hidden_dim, d_ff=hidden_dim, heads=n_head, layers=1, dropout=dropout)
-        
         # Unimodal-level Gated Fusion
         self.x_x_gate = Unimodal_GatedFusion(hidden_dim, dataset)
-        self.y_x_gate = Unimodal_GatedFusion(hidden_dim, dataset)
-        self.z_x_gate = Unimodal_GatedFusion(hidden_dim, dataset)
-
-        self.features_reduce = nn.Linear(3 * hidden_dim, hidden_dim)
 
         # Emotion Classifier
         self.output_layer = nn.Sequential(
@@ -733,7 +705,7 @@ class Single_Modal_Transformer_Based_Model(nn.Module):
             nn.Linear(hidden_dim, n_classes)
             )
 
-    def forward(self, textf, visuf, acouf, u_mask, qmask, dia_len, Modal):
+    def forward(self, inputf, u_mask, qmask, dia_len, Modal):
         spk_idx = torch.argmax(qmask, -1)
         origin_spk_idx = spk_idx
         if self.n_speakers == 2:
@@ -746,66 +718,20 @@ class Single_Modal_Transformer_Based_Model(nn.Module):
             for i, x in enumerate(dia_len):
                 spk_idx[i, x:] = (6*torch.ones(origin_spk_idx[i].size(0)-x)).int().cuda()
 
+        #発話埋め込み
         spk_embeddings = self.speaker_embeddings(spk_idx)
 
-        Module_flag = Modal
-
-        #9/7 モダリティごとに埋め込み
-        # spk_embeddings_t = self.speaker_embeddings_t(spk_idx)
-        # spk_embeddings_a = self.speaker_embeddings_a(spk_idx)
-        # spk_embeddings_v = self.speaker_embeddings_v(spk_idx)
-
-        # Temporal convolutional layers
-        # print("textf.shape before Conv1d:", textf.shape)
-
-        # print("NaN in textf:", torch.isnan(textf).any().item())
-        # print("Inf in textf:", torch.isinf(textf).any().item())
-
         #入力の特徴
-        textf = self.textf_input(textf.permute(1, 2, 0)).transpose(1, 2)
-        acouf = self.acouf_input(acouf.permute(1, 2, 0)).transpose(1, 2)
-        visuf = self.visuf_input(visuf.permute(1, 2, 0)).transpose(1, 2)
-
-
-
+        inputf = self._input(inputf.permute(1, 2, 0)).transpose(1, 2)
+   
         # Intra- and Inter-modal Transformers
-        if Module_flag == "t":
-            x_x_transformer_out = self.x_x(textf, textf, u_mask, spk_embeddings)
-            y_x_transformer_out = self.y_x(acouf, textf, u_mask, spk_embeddings) #self attentionのみで　9/17
-            z_x_transformer_out = self.z_x(visuf, textf, u_mask, spk_embeddings)
-        elif Module_flag == "a":
-            x_x_transformer_out = self.x_x(acouf, acouf, u_mask, spk_embeddings)
-            y_x_transformer_out = self.y_x(textf, acouf, u_mask, spk_embeddings)
-            z_x_transformer_out = self.z_x(visuf, acouf, u_mask, spk_embeddings)
-        else:
-            x_x_transformer_out = self.x_x(visuf, visuf, u_mask, spk_embeddings)
-            y_x_transformer_out = self.y_x(textf, visuf, u_mask, spk_embeddings)
-            z_x_transformer_out = self.z_x(acouf, visuf, u_mask, spk_embeddings)
-
-        # #9/7 モダリティごとに埋め込み
-        # t_t_transformer_out = self.t_t(textf, textf, u_mask, spk_embeddings_t, spk_embeddings_t)
-        # a_t_transformer_out = self.a_t(acouf, textf, u_mask, spk_embeddings_a, spk_embeddings_t)
-        # v_t_transformer_out = self.v_t(visuf, textf, u_mask, spk_embeddings_v, spk_embeddings_t)
-
-        # a_a_transformer_out = self.a_a(acouf, acouf, u_mask, spk_embeddings_a, spk_embeddings_a)
-        # t_a_transformer_out = self.t_a(textf, acouf, u_mask, spk_embeddings_t, spk_embeddings_a)
-        # v_a_transformer_out = self.v_a(visuf, acouf, u_mask, spk_embeddings_v, spk_embeddings_a)
-
-        # v_v_transformer_out = self.v_v(visuf, visuf, u_mask, spk_embeddings_v, spk_embeddings_v)
-        # t_v_transformer_out = self.t_v(textf, visuf, u_mask, spk_embeddings_t, spk_embeddings_v)
-        # a_v_transformer_out = self.a_v(acouf, visuf, u_mask, spk_embeddings_a, spk_embeddings_v)
+        x_x_transformer_out = self.x_x(inputf, inputf, u_mask, spk_embeddings)
 
         # Unimodal-level Gated Fusion
-        x_x_transformer_out = self.x_x_gate(x_x_transformer_out) #torch.Size([16, 74, 1024])
-        y_x_transformer_out = self.y_x_gate(y_x_transformer_out) #torch.Size([16, 74, 1024])
-        z_x_transformer_out = self.z_x_gate(z_x_transformer_out) #torch.Size([16, 74, 1024])
-
-        transformer_out = self.features_reduce(torch.cat([x_x_transformer_out, y_x_transformer_out, z_x_transformer_out], dim=-1)) #torch.Size([16, 74, 1024])
+        transformer_out = self.x_x_gate(x_x_transformer_out) #torch.Size([16, 74, 1024])
 
         # Emotion Classifier
         final_out = self.output_layer(transformer_out)
-        # # ##9/17 self attentionのみ
-        # final_out = self.output_layer(x_x_transformer_out)
 
         #各モダリティのlog softmax 損失計算用
         log_prob = F.log_softmax(final_out, 2)
@@ -981,13 +907,35 @@ class MaskedL2Loss(nn.Module):
 
         # マスク適用
         masked_loss = l2_per_utt * mask.float()
-        # print("L2損失")
-        # print(masked_loss)
-
-        # 正規化 (有効発話数で割る)
+        
         return masked_loss.sum()
+        # 正規化 (有効発話数で割る)
         #return masked_loss.sum() / mask.sum()
     
+#パディングマスク付きL2損失 ルート採用
+class MaskedL2Loss_2(nn.Module):
+    def __init__(self, eps=1e-8):
+        super().__init__()
+        self.eps = eps
+
+    def forward(self, feat1, feat2, mask):
+        """
+        feat1: (B, T, D)
+        feat2: (B, T, D)
+        mask:  (B, T)  → 0 or 1
+        """
+        # (B, T, D)
+        diff = feat1 - feat2
+
+        # 各発話（時刻）ごとのL2距離 → (B, T)
+        l2_per_utt = torch.sqrt(
+            torch.sum(diff ** 2, dim=-1) + self.eps
+        )
+
+        # マスク適用
+        masked_loss = l2_per_utt * mask.float()
+        
+        return masked_loss.sum()
 
     
 class autoencoder_and_multimodal_Model_with_flag(nn.Module):
@@ -1139,9 +1087,319 @@ class autoencoder_and_multimodal_Model_with_flag_binary(nn.Module):
 
         return final_prob, final_log_prob, binary_t_mask, binary_a_mask, binary_v_mask
 
-###demo
-if __name__ == '__main__':
+# =========================
+# regression (classifier)
+# =========================
+class RegressionHead(nn.Module):
+    def __init__(self, input_dim, n_classes):
+        super().__init__()
+        
 
+    def forward(self, x):
+        # x: (B, T, D)
+        return self.fc(x)
+
+
+# =========================
+# MTCN FULL MODEL
+# =========================
+class E2EHierarchicalMCTN(nn.Module):
+    def __init__(self,
+                 input_dim,
+                 second_dim,
+                 third_dim,
+                 hidden_dim,
+                 n_classes,
+                 is_cycled=True):
+
+        super().__init__()
+
+        self.is_cycled = is_cycled
+
+        # -------- Level1 --------
+        self.encoder1 = nn.LSTM(input_dim, hidden_dim, batch_first=True)
+        self.decoder1 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.out1 = nn.Linear(hidden_dim, second_dim)
+
+        if is_cycled:
+            self.cycle_enc = nn.LSTM(second_dim, hidden_dim, batch_first=True)
+            self.cycle_dec = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+            self.cycle_out = nn.Linear(hidden_dim, input_dim)
+
+        # -------- Level2 --------
+        self.encoder2 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.decoder2 = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.out2 = nn.Linear(hidden_dim, third_dim)
+
+        # -------- classifier --------
+        # self.classifier = nn.Linear(hidden_dim, n_classes)
+        self.classifier = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(hidden_dim, n_classes)
+                    )
+
+    def forward(self, x):
+        # ---- Level1 ----
+        enc1, _ = self.encoder1(x)
+        dec1, _ = self.decoder1(enc1)
+        out1 = self.out1(dec1)
+
+        cycle_out = None
+        if self.is_cycled:
+            cenc, _ = self.cycle_enc(out1)
+            cdec, _ = self.cycle_dec(cenc)
+            cycle_out = self.cycle_out(cdec)
+
+        # ---- Level2 ----
+        enc2, _ = self.encoder2(enc1)
+        dec2, _ = self.decoder2(enc2)
+        out2 = self.out2(dec2)
+
+        # ---- classification ----
+        cls = self.classifier(enc2)
+
+        return out1, cycle_out, out2, cls
+
+
+# =========================
+# MTCN NEW MODEL
+# =========================
+class E2EParallelMCTN(nn.Module):
+    def __init__(self,
+                 text_dim,
+                 audio_dim,
+                 visual_dim,
+                 hidden_dim,
+                 n_classes,
+                ):
+
+        super().__init__()
+
+        # -------- text --------
+        self.encoder_t = nn.LSTM(text_dim, hidden_dim, batch_first=True)
+        self.decoder_t = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.out_t = nn.Linear(hidden_dim, text_dim)
+
+
+        # -------- audio --------
+        self.encoder_a = nn.LSTM(audio_dim, hidden_dim, batch_first=True)
+        self.decoder_a = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.out_a = nn.Linear(hidden_dim, audio_dim)
+
+        # -------- visual --------
+        self.encoder_v = nn.LSTM(visual_dim, hidden_dim, batch_first=True)
+        self.decoder_v = nn.LSTM(hidden_dim, hidden_dim, batch_first=True)
+        self.out_v = nn.Linear(hidden_dim, visual_dim)
+
+        # -------- classifier --------
+        self.classifier = nn.Sequential(
+                    nn.Linear(hidden_dim, hidden_dim),
+                    nn.ReLU(),
+                    nn.Linear(hidden_dim, n_classes)
+                    )
+
+    def forward(self, t, a, v, modal, is_cycle):
+        # -------- text --------
+        enc_t, _ = self.encoder_t(t)       #shape [発話数, バッチサイズ, hidden_dim]
+
+        dec_t2a, _ = self.decoder_a(enc_t) #shape [発話数, バッチサイズ, hidden_dim]
+        out_t2a = self.out_a(dec_t2a)      #shape [発話数, バッチサイズ, modal_dim]
+    
+        dec_t2v, _ = self.decoder_v(enc_t) #shape [発話数, バッチサイズ, hidden_dim]
+        out_t2v = self.out_v(dec_t2v)      #shape [発話数, バッチサイズ, modal_dim]
+
+        # -------- audio --------
+        enc_a, _ = self.encoder_a(a)       #shape [発話数, バッチサイズ, hidden_dim]
+
+        dec_a2t, _ = self.decoder_t(enc_a)
+        out_a2t = self.out_t(dec_a2t)      #shape [発話数, バッチサイズ, modal_dim]
+    
+        dec_a2v, _ = self.decoder_v(enc_a)
+        out_a2v = self.out_v(dec_a2v)      #shape [発話数, バッチサイズ, modal_dim]
+
+        # -------- visual --------
+        enc_v, _ = self.encoder_v(v)       #shape [発話数, バッチサイズ, hidden_dim]
+
+        dec_v2t, _ = self.decoder_t(enc_v) #shape [発話数, バッチサイズ, hidden_dim]
+        out_v2t = self.out_t(dec_v2t)      #shape [発話数, バッチサイズ, modal_dim]
+
+        dec_v2a, _ = self.decoder_a(enc_v) #shape [発話数, バッチサイズ, hidden_dim]
+        out_v2a = self.out_a(dec_v2a)      #shape [発話数, バッチサイズ, modal_dim]
+
+        # ------- is_cycle -------
+        if is_cycle:
+            ##to text
+            enc_cycle_t2a, _ = self.encoder_a(out_t2a)
+
+            dec_cycle_t2a, _ = self.decoder_t(enc_cycle_t2a)
+            back_cycle_t2a = self.out_t(dec_cycle_t2a)
+
+            enc_cycle_t2v, _ = self.encoder_v(out_t2v)
+
+            dec_cycle_t2v, _ = self.decoder_t(enc_cycle_t2v)
+            back_cycle_t2v = self.out_t(dec_cycle_t2v)
+
+            ##to audio
+            enc_cycle_a2t, _ = self.encoder_t(out_a2t)
+
+            dec_cycle_a2t, _ = self.decoder_a(enc_cycle_a2t)
+            back_cycle_a2t = self.out_a(dec_cycle_a2t)
+
+            enc_cycle_a2v, _ = self.encoder_v(out_a2v)
+
+            dec_cycle_a2v, _ = self.decoder_a(enc_cycle_a2v)
+            back_cycle_a2v = self.out_a(dec_cycle_a2v)
+
+            ##to text
+            enc_cycle_v2t, _ = self.encoder_t(out_v2t)
+
+            dec_cycle_v2t, _ = self.decoder_v(enc_cycle_v2t)
+            back_cycle_v2t = self.out_v(dec_cycle_v2t)
+
+            enc_cycle_v2a, _ = self.encoder_a(out_v2a)
+
+            dec_cycle_v2a, _ = self.decoder_v(enc_cycle_v2a)
+            back_cycle_v2a = self.out_v(dec_cycle_v2a)
+
+        else:
+            back_cycle_t2a = torch.full_like(out_a2t, float('nan'))
+            back_cycle_t2v = torch.full_like(out_a2t, float('nan'))
+
+            back_cycle_a2t = torch.full_like(out_t2a, float('nan'))
+            back_cycle_a2v = torch.full_like(out_t2a, float('nan'))
+
+            back_cycle_v2t = torch.full_like(out_a2v, float('nan'))
+            back_cycle_v2a = torch.full_like(out_a2v, float('nan'))
+
+        # ---- classification ----
+        if modal=="T":
+            joint_emb = enc_t
+        elif modal=="A":
+            joint_emb = enc_a
+        else:
+            joint_emb = enc_v
+
+        cls = self.classifier(joint_emb)
+
+        return out_t2a, out_t2v, out_a2t, out_a2v, out_v2t, out_v2a, \
+               cls, \
+               enc_t, enc_a, enc_v, \
+               back_cycle_t2a, back_cycle_t2v, back_cycle_a2t, back_cycle_a2v, back_cycle_v2t, back_cycle_v2a
+    
+# =========================
+# MASKED CONTRASIVE LOSS
+# =========================
+def masked_contrastive_loss(
+    z_a,
+    z_b,
+    mask,
+    tau=1.00,
+    eps=1e-8
+):
+    """
+    Mask付き時系列 InfoNCE Loss
+
+    Parameters
+    ----------
+    z_a : Tensor
+        shape = [seq_len, batch_size, dim]
+
+    z_b : Tensor
+        shape = [seq_len, batch_size, dim]
+
+    mask : Tensor
+        shape = [seq_len, batch_size]
+
+        有効発話: 1
+        padding : 0
+
+    tau : float
+
+    Returns
+    -------
+    loss : Tensor
+    """
+
+    seq_len, batch_size, dim = z_a.shape
+    # mask = mask.transpose(0, 1)
+
+    total_loss = 0.0
+    valid_steps = 0
+
+    for t in range(seq_len):
+
+        # ===== 有効サンプル抽出 =====
+        valid_idx = mask[t].bool()
+
+        # 全部paddingならskip
+        if valid_idx.sum() <= 1:
+            continue
+
+        # [N_valid, D]
+        feat_a = z_a[t][valid_idx]
+        feat_b = z_b[t][valid_idx]
+
+        # ===== normalize =====
+        feat_a = F.normalize(feat_a, dim=1)
+        feat_b = F.normalize(feat_b, dim=1)
+
+        # ===== cosine similarity =====
+        # [N,N]
+        sim_matrix = torch.matmul(feat_a, feat_b.T)
+
+        # temperature
+        sim_matrix = sim_matrix / tau
+
+        # ==================================================
+        # A -> B
+        # ==================================================
+
+        # exp(sim)
+        exp_sim = torch.exp(sim_matrix)
+
+        # positive pair
+        # [N]
+        pos_sim = torch.diag(exp_sim)
+
+        # denominator
+        # [N]
+        denom = exp_sim.sum(dim=1)
+
+        # InfoNCE
+        loss_ab = -torch.log(pos_sim / (denom + eps) + eps)
+
+        loss_ab = loss_ab.mean()
+
+        # ==================================================
+        # B -> A
+        # ==================================================
+
+        exp_sim_t = torch.exp(sim_matrix.T)
+
+        pos_sim_t = torch.diag(exp_sim_t)
+
+        denom_t = exp_sim_t.sum(dim=1)
+
+        loss_ba = -torch.log(pos_sim_t / (denom_t + eps) + eps)
+
+        loss_ba = loss_ba.mean()
+
+        # symmetric loss
+        loss = (loss_ab + loss_ba) / 2
+
+        total_loss += loss
+        valid_steps += 1
+
+    if valid_steps == 0:
+        return torch.tensor(0.0, device=z_a.device)
+
+    total_loss = total_loss / valid_steps
+
+    return total_loss
+
+if __name__ == '__main__':
+###demo
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # --- 基本設定 ---
     max_utt = 21   # バッチ内の最大発話数
@@ -1184,9 +1442,6 @@ if __name__ == '__main__':
     # print("label:", label.shape)
     # print("lengths:", lengths.tolist())
 
-    # モダリティフラグ (0/1)
-    modality_flags = torch.randint(0, 2, (batch_size, max_utt, 3)).float().to(device)
-    print("modality_flags.shape =", modality_flags[0][0])
 
     # === データを同じデバイスへ転送 ===
     textf = textf.to(device)
@@ -1196,17 +1451,36 @@ if __name__ == '__main__':
     qmask = qmask.to(device)
 
     #モデルの定義
-    hidden_dim = 1024
-    binary_dim = 256
-    finetune_flag = True
-    temp = 1
-    auto_t = "experience_results/1009_autoencoder/text/weights/model_weights_last.pth"
-    auto_a = "experience_results/1009_autoencoder/audio/weights/model_weights_last.pth"
-    auto_v = "experience_results/1009_autoencoder/visual/weights/model_weights_last.pth"
-    model = autoencoder_and_multimodal_Model_with_flag_binary(auto_t, auto_a, auto_v, hidden_dim, binary_dim, num_classes, finetune_flag, temp).to(device)
+    text_dim = 1024
+    audio_dim = 1582
+    visual_dim = 342
+    hidden_dim = 32
 
-    model(textf, visuf, acouf, umask, qmask, lengths, modality_flags)
-
+    model = E2EParallelMCTN(text_dim, audio_dim, visual_dim, hidden_dim, num_classes).to(device)
+    #model = E2EHierarchicalMCTN(input_dim=text_dim, second_dim=audio_dim, third_dim=visual_dim, hidden_dim=hidden_dim, n_classes=num_classes).to(device)
     def count_trainable_params(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     print("Trainable parameters:", count_trainable_params(model))
+
+    #out1, cycle_out, out2, cls = model(textf)
+    out_t2a, out_t2v, out_a2t, out_a2v, out_v2t, out_v2a, \
+    cls, enc_t, enc_a, enc_v, \
+    back_cycle_t2a, back_cycle_t2v, back_cycle_a2t, back_cycle_a2v, back_cycle_v2t, back_cycle_v2a = model(textf, acouf, visuf, "T", True)
+
+
+    #オートエンコーダモデルテスト
+    #モデルの定義
+    # hidden_dim = 1024
+    # binary_dim = 256
+    # finetune_flag = True
+    # temp = 1
+    # auto_t = "experience_results/1009_autoencoder/text/weights/model_weights_last.pth"
+    # auto_a = "experience_results/1009_autoencoder/audio/weights/model_weights_last.pth"
+    # auto_v = "experience_results/1009_autoencoder/visual/weights/model_weights_last.pth"
+    # model = autoencoder_and_multimodal_Model_with_flag_binary(auto_t, auto_a, auto_v, hidden_dim, binary_dim, num_classes, finetune_flag, temp).to(device)
+
+    # model(textf, visuf, acouf, umask, qmask, lengths, modality_flags)
+
+    # def count_trainable_params(model):
+    #     return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    # print("Trainable parameters:", count_trainable_params(model))

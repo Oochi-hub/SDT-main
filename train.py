@@ -662,21 +662,11 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
     for data in dataloader:
         if train:
             optimizer.zero_grad()
-    
-        if data_flag == "MELD_c":
-            textf, visuf, acouf, qmask, umask, label, cmatrix= [d.cuda() for d in data[:-2]] if cuda else data[:-2]
-        
-            # cmatrix = data[-3] # キャラクター情報
-            texts = data[-2]  # 発話テキスト
-            vids = data[-1]  # 会話ID
 
-            cmatrix = cmatrix.permute(1, 0, 2)
-            cmatrix_np = cmatrix.cpu().numpy()
-        else:
-            textf, visuf, acouf, qmask, umask, label = [d.cuda() for d in data[:-2]] if cuda else data[:-2]
-        
-            texts = data[-2]  # 発話テキスト
-            vids = data[-1]  # 会話ID
+        textf, visuf, acouf, qmask, umask, label = [d.cuda() for d in data[:-2]] if cuda else data[:-2]
+    
+        texts = data[-2]  # 発話テキスト
+        vids = data[-1]  # 会話ID
 
         qmask = qmask.permute(1, 0, 2) #qmask: 人物の区別のための行列   torch.Size([21, 8, 9])
         lengths = [(umask[j] == 1).nonzero().tolist()[-1][0] + 1 for j in range(len(umask))] #各会話の発話数をumaskから逆算 list 長さ=バッチサイズ
@@ -712,14 +702,15 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
         #モダリティごと埋め込み用
         demo_charaID_flag = False
 
-        if demo_charaID_flag:
-            #prob1:t prob2:a prob3v
-            log_prob, prob, _, _ = model(textf, visuf, acouf, umask, cmatrix, lengths, modal)
-        else:
-            #prob1:t prob2:a prob3v
-            log_prob, prob, _, _ = model(textf, visuf, acouf, umask, qmask, lengths, modal)
-        
+        #prob1:t prob2:a prob3v
+        if modal=="t":
+            log_prob, prob, _, _ = model(textf, umask, qmask, lengths, modal)
+        elif modal=="a":
+            log_prob, prob, _, _ = model(acouf, umask, qmask, lengths, modal)  
+        else:     
+            log_prob, prob, _, _ = model(visuf, umask, qmask, lengths, modal)  
 
+        #正解ラベル
         lp_all = log_prob.view(-1, log_prob.size()[2])
         labels_ = label.view(-1)
 
@@ -760,58 +751,32 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
                 for yi in range(y):
                     mask_value = umask_np[xi][yi]
                     if mask_value == 1:
-                        if data_flag == 'MELD_c':
-                            #MELDでは各人物ごとにまとめる
-                            character = list(cmatrix_np[xi][yi]).index(1)
-                            all_pred.append({"vid": vid_,
-                                        "utt_index": yi,
-                                        "character": character,
-                                        "pred": all_probmax_np[xi][yi],
-                                        "true": label_np[xi][yi],
-                                        "text": texts[xi][yi], 
-                                        "all_prob": str(all_prob_np[xi][yi].tolist()) #csvに保存するので文字列に
-                                        })
-                            #誤分類を収集
-                            if all_probmax_np[xi][yi] != label_np[xi][yi]:
-                                misclassified.append({"vid": vid_,
-                                        "utt_index": yi,
-                                        "character": character,
-                                        "pred": all_probmax_np[xi][yi],
-                                        "true": label_np[xi][yi],
-                                        "text": texts[xi][yi], 
-                                        "all_prob": str(all_prob_np[xi][yi].tolist()) #csvに保存するので文字列に
-                                        })
-                        else:
-                            #MELD_c以外はキャラ情報なしで記録
-                            all_pred.append({"vid": vid_,
-                                        "utt_index": yi,
-                                        "pred": all_probmax_np[xi][yi],
-                                        "true": label_np[xi][yi],
-                                        "text": texts[xi][yi], 
-                                        "all_prob": str(all_prob_np[xi][yi].tolist()) #csvに保存するので文字列に
-                                        })
-                            #誤分類を収集
-                            if all_probmax_np[xi][yi] != label_np[xi][yi]:
-                                misclassified.append({"vid": vid_,
-                                        "utt_index": yi,
-                                        "pred": all_probmax_np[xi][yi],
-                                        "true": label_np[xi][yi],
-                                        "text": texts[xi][yi], 
-                                        "all_prob": str(all_prob_np[xi][yi].tolist())
-                                        })
+                        #MELD_c以外はキャラ情報なしで記録
+                        all_pred.append({"vid": vid_,
+                                    "utt_index": yi,
+                                    "pred": all_probmax_np[xi][yi],
+                                    "true": label_np[xi][yi],
+                                    "text": texts[xi][yi], 
+                                    "all_prob": str(all_prob_np[xi][yi].tolist()) #csvに保存するので文字列に
+                                    })
+                        #誤分類を収集
+                        if all_probmax_np[xi][yi] != label_np[xi][yi]:
+                            misclassified.append({"vid": vid_,
+                                    "utt_index": yi,
+                                    "pred": all_probmax_np[xi][yi],
+                                    "true": label_np[xi][yi],
+                                    "text": texts[xi][yi], 
+                                    "all_prob": str(all_prob_np[xi][yi].tolist())
+                                    })
 
 
         preds.append(pred_.data.cpu().numpy())
-
-
 
         labels.append(labels_.data.cpu().numpy())
         masks.append(umask.view(-1).cpu().numpy())
 
         losses.append(L_task.item()*masks[-1].sum())
         
-  
-
         #誤差逆伝搬
         if train:
             L_task.backward()
@@ -936,15 +901,9 @@ if __name__ == '__main__':
     parser.add_argument('--schedular', type=float, default=1.0) #ExponentialLR用 epochごとに何倍するか
     parser.add_argument('--dynamic', action='store_true', default=False)#動的な係数の有無
     parser.add_argument('--loss_func', default='kl', help='which use loss_func, kl or ws') #損失関数にKLかWSのどちらを使うか
-    parser.add_argument('--model', type=str, default="multi", help='multi or text or audio or visual')
+    parser.add_argument('--modal', type=str, default="multi", help='multi or text or audio or visual')
     parser.add_argument('--valid_num', type=int, default=0) #交差検証用
-    # parser.add_argument('--gannma_1', type=float, default=1.0)
-    # parser.add_argument('--gannma_2', type=float, default=1.0)
-    # parser.add_argument('--gannma_3', type=float, default=1.0)
-    # parser.add_argument('--kl_epoch', type=int, default=0)
-    # parser.add_argument('--flag_1', default=False) ##7/14　自己蒸留項の増大と学習減衰の実験用
-    # parser.add_argument('--flag_2', default=False)
-    # parser.add_argument('--flag_3', default=False)
+
 
 
     args = parser.parse_args()
@@ -978,22 +937,23 @@ if __name__ == '__main__':
         writer = SummaryWriter()
 
     cuda = args.cuda
+    #学習エポック数
     n_epochs = args.epochs
+    #バッチサイズ
     batch_size = args.batch_size
+    #各モダリティの次元数
     feat2dim = {'IS10':1582, 'denseface':342, 'MELD_audio':300}
     D_audio = feat2dim['IS10'] if args.Dataset=='IEMOCAP' else feat2dim['MELD_audio']
     D_visual = feat2dim['denseface']
     D_text = 1024
+    ##単一入力モデル用 keyで入力次元を指定
+    D_input_dic = {"t":D_text, "a":D_audio, "v":D_visual}
 
-    D_m = D_audio + D_visual + D_text
-
-    # n_speakers = 9 if args.Dataset=='MELD' else 2
-    # n_classes = 7 if args.Dataset=='MELD' else 6 if args.Dataset=='IEMOCAP' else 1
 
     n_speakers = 2 if args.Dataset=='IEMOCAP' else 9
     n_classes = 6 if args.Dataset=='IEMOCAP' else 7 
 
-    if args.model == "multi":
+    if args.modal == "multi":
         #エポックごとの学習記録
         history = {"train_loss": [], "train_acc": [],
                 "train_ce_loss": [],"train_kl_loss": [], "train_ws_loss":[],"train_task_loss":[],
@@ -1033,30 +993,28 @@ if __name__ == '__main__':
     #キャラID demo
     demo_charaID_flag = False
 
-    if args.model == "multi":
+    if args.modal == "multi":
         model = Transformer_Based_Model(args.Dataset, args.temp, D_text, D_visual, D_audio, args.n_head,
                                             n_classes=n_classes,
                                             hidden_dim=args.hidden_dim,
                                             n_speakers=n_speakers,
                                             dropout=args.dropout,
                                             demo_charaID_flag = demo_charaID_flag)
-
-        total_params = sum(p.numel() for p in model.parameters())
-        print('total parameters: {}'.format(total_params))
-        total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print('training parameters: {}'.format(total_trainable_params))
     else:
-        model = Single_Modal_Transformer_Based_Model(args.Dataset, args.temp, D_text, D_visual, D_audio, args.n_head,
+        #入力特徴次元を指定
+        D_input = D_input_dic[args.modal]
+
+        model = Single_Modal_Transformer_Based_Model(args.Dataset, args.temp, D_input, args.n_head,
                                             n_classes=n_classes,
                                             hidden_dim=args.hidden_dim,
                                             n_speakers=n_speakers,
                                             dropout=args.dropout,
                                             demo_charaID_flag = demo_charaID_flag)
 
-        total_params = sum(p.numel() for p in model.parameters())
-        print('total parameters: {}'.format(total_params))
-        total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-        print('training parameters: {}'.format(total_trainable_params))
+    total_params = sum(p.numel() for p in model.parameters())
+    print('total parameters: {}'.format(total_params))
+    total_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print('training parameters: {}'.format(total_trainable_params))
 
     if cuda:
         model.cuda()
@@ -1118,7 +1076,7 @@ if __name__ == '__main__':
     for e in range(n_epochs):
         start_time = time.time()
 
-        if args.model == "multi":
+        if args.modal == "multi":
             #学習
             train_loss, train_acc, _, _, _, train_fscore, hoge, _,\
             train_ce_loss, train_kl_loss, train_ws_loss, train_task_loss, \
@@ -1349,19 +1307,15 @@ if __name__ == '__main__':
         #単一モダリティでの学習
         else:
             #学習
-            # train_loss, train_acc, _, _, _, train_fscore, hoge, _,\
-            #     = uni_train_or_eval_model(model, loss_function, train_loader, e, optimizer, True, data_flag=args.Dataset, modal=args.model) #9/25 削減した学習データでの学習
-
-            # train_loader -> valid_loader 
             train_loss, train_acc, _, _, _, train_fscore, hoge, _,\
-                = uni_train_or_eval_model(model, loss_function, train_loader, e, optimizer, True, data_flag=args.Dataset, modal=args.model) #9/25 削減した学習データでの学習
+                = uni_train_or_eval_model(model, loss_function, train_loader, e, optimizer, True, data_flag=args.Dataset, modal=args.modal) #9/25 削減した学習データでの学習
 
             valid_loss, valid_acc, _, _, _, valid_fscore, hoge, _,\
-                = uni_train_or_eval_model(model, loss_function, valid_loader, e, data_flag=args.Dataset, modal=args.model)
+                = uni_train_or_eval_model(model, loss_function, valid_loader, e, data_flag=args.Dataset, modal=args.modal)
 
             #検証，テスト(テストデータを使用)
             test_loss, test_acc, test_label, test_pred, test_mask, test_fscore, misclassified, all_pred,\
-                = uni_train_or_eval_model(model, loss_function, test_loader, e, data_flag=args.Dataset, modal=args.model)
+                = uni_train_or_eval_model(model, loss_function, test_loader, e, data_flag=args.Dataset, modal=args.modal)
 
             all_acc.append(test_acc)
             all_fscore.append(test_fscore)
@@ -1423,7 +1377,7 @@ if __name__ == '__main__':
         name_class = ['neutral', 'surprise', 'fear', 'sadness', 'joy', 'disgust', 'anger']
 
     with open(args.out_path+"/all_pred.csv", "w", newline='') as f:
-        if args.model == "multi":
+        if args.modal == "multi":
             fieldnames2 = ["vid", "utt_index", "character","pred", "true", "text", "all_prob", "t_prob", "a_prob", "v_prob"]
         else:
             fieldnames2 = ["vid", "utt_index", "character","pred", "true", "text", "all_prob"]
@@ -1457,15 +1411,14 @@ if __name__ == '__main__':
 
 
     make_cm(best_label, best_pred, best_mask, name_class, "cm")
-    if args.model == "multi":
+    if args.modal == "multi":
         make_cm(best_label, best_pred_t, best_mask, name_class, "cm_t")
         make_cm(best_label, best_pred_a, best_mask, name_class, "cm_a")
         make_cm(best_label, best_pred_v, best_mask, name_class, "cm_v")
 
     #学習の記録
-    show_history(history, args.out_path, args.Dataset, args.model)
+    show_history(history, args.out_path, args.Dataset, args.modal)
     csv_history(history, args.out_path)
 
-    if args.model == "multi":
+    if args.modal == "multi":
         csv_history_coeff(history_coeff, args.out_path)
-

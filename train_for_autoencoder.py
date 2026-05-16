@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.utils.data.sampler import SubsetRandomSampler
 from dataloader import IEMOCAPDataset, MELDDataset, MELDDataset_c
-from model import MaskedNLLLoss, MaskedKLDivLoss, Single_Modal_Transformer_Based_Model, AutoEncoder, Symmetry_AutoEncoder, MaskedL2Loss
+from model import AutoEncoder, Symmetry_AutoEncoder, MaskedL2Loss, MaskedL2Loss_2
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, classification_report, accuracy_score, f1_score
 import pickle as pk
@@ -16,6 +16,10 @@ import datetime
 import pandas as pd
 import csv
 import ast
+import torch.nn as nn
+import torch.nn.functional as F
+import numpy as np
+import matplotlib.pyplot as plt
 
 # 学習率スケジューラー
 from torch.optim import lr_scheduler
@@ -28,7 +32,15 @@ seed = 42
 torch.manual_seed(seed)
 random.seed(seed)
 
+class MaskedKLDivLoss(nn.Module):
+    def __init__(self):
+        super(MaskedKLDivLoss, self).__init__()
 
+    def forward(self, log_pred, target, mask):
+        losses = F.kl_div(log_pred, target, reduction='none')  # shape: [B, C]
+        masked_loss = (losses.sum(dim=1)) * mask.view(-1).float()  # sum over classes, then mask
+  
+        return masked_loss.sum()
 
 #train_loss train_acc val_loss val_accの保存
 def csv_history(dict, output_folder):
@@ -108,14 +120,6 @@ def show_history(history, out_folder):
     plt.ylim(0, 100)
     #plt.ylim(60,100)
     plt.savefig(output_folder_grah+'/grah_acc.png')
-
-    # # グラフの描画
-    # plt.figure(figsize=(8, 4))
-    # plt.plot(range(1,len(history["lr"])+1),history["lr"], marker='o')
-    # plt.title("ExponentialLR Learning Rate Schedule")
-    # plt.xlabel("epoch")
-    # plt.ylabel("Learning Rate")
-    # plt.savefig(output_folder_grah+'/grah_lr.png')
 
 def get_train_valid_sampler(trainset, valid=0.1, valid_num=0):
     size = len(trainset)
@@ -253,16 +257,6 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
         qmask = qmask.permute(1, 0, 2) #qmask: 人物の区別のための行列   torch.Size([21, 8, 9])
         lengths = [(umask[j] == 1).nonzero().tolist()[-1][0] + 1 for j in range(len(umask))] #各会話の発話数をumaskから逆算 list 長さ=バッチサイズ
 
-        # print("textf: ",textf.shape)
-        # print("visuf: ", visuf.shape)
-        # print("acouf: ", acouf.shape)
-        # print("qmask: ", qmask.shape)
-        # print("umask: ", umask.shape)
-        # print("label: ", label.shape)
-        # print("texts:", np.shape(texts[0]))
-        # print("cmatrix:", cmatrix.shape)
-        # print('vids:', vids)
-
         """
         各入力の説明とデモ(21:バッチ内最大発話数, 16:バッチサイズ 9:MELDの最大話者 IEMOは2 7:MELDのキャラクタID数)
         textf: テキスト特徴量           torch.Size([21, 16, 1024])
@@ -298,30 +292,32 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
             #prob1:t prob2:a prob3v
             target_pred, features, z, h_hat, binary_prob, kl_log_prob = model(textf, visuf, acouf, umask, qmask, lengths, modal)
         
-
         labels_ = label.view(-1)
 
+              #モダリティごとの係数 12/19
+        coeff_dict = {"t":(5.692, 0.176), "a":(6.028, 0.190), "v":(6.341, 0.158)}
+
+        beta, alpha = coeff_dict[modal]
 
         ##L2損失計算
-        L_l2 = loss_function(h_hat, features, umask)
+        L_l2 =alpha * loss_function(h_hat, features, umask)
 
         #KL損失計算
         target = target_pred.view(-1, target_pred.size()[2])
         kl_p = kl_log_prob.view(-1, kl_log_prob.size()[2])
-        L_kl = kl_loss(kl_p, target, umask)
+        L_kl =beta * kl_loss(kl_p, target, umask)
 
-        # ##モデル全体の損失
-        # L_task = L_l2 + L_kl
+  
 
-        ##モデル全体の損失 #試験的取り組み12/11
-        L_task = L_l2 * L_kl
+        ##モデル全体の損失
+        L_task =  L_l2 +  L_kl
+
+        # ##モデル全体の損失 #試験的取り組み12/11
+        # L_task = L_l2 * L_kl
 
         #誤分類事例の回収
         lp_ = binary_prob.view(-1, binary_prob.size()[2])
         pred_ = torch.argmax(lp_,1)
-
-
-
 
         # print("pred_", pred_.size())
         """
@@ -399,9 +395,6 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
         masks.append(umask.view(-1).cpu().numpy())
 
         #各損失の保存
-        # losses.append(L_task.item()*masks[-1].sum())
-        # kl_losses.append(L_kl.item()*masks[-1].sum())
-        # l2_losses.append(L_l2.item()*masks[-1].sum())
         losses.append(L_task.item())
         kl_losses.append(L_kl.item())
         l2_losses.append(L_l2.item())
@@ -425,11 +418,6 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
                float('nan'), float('nan') #avg_kl, avg_l2
 
     #avg_ 表示用　有効サンプル数(発話数)で割る
-    # avg_loss = round(np.sum(losses)/np.sum(masks), 4)
-    # avg_accuracy = round(accuracy_score(labels,preds, sample_weight=masks)*100, 2)
-    # avg_fscore = round(f1_score(labels,preds, sample_weight=masks, average='weighted')*100, 2)
-    # avg_kl_loss = round(np.sum(kl_losses)/np.sum(masks), 4)
-    # avg_l2_loss = round(np.sum(l2_losses)/np.sum(masks), 4)
     avg_loss = round(np.sum(losses)/(len(losses)*np.sum(masks)), 4)
     avg_accuracy = round(accuracy_score(labels,preds, sample_weight=masks)*100, 2)
     avg_fscore = round(f1_score(labels,preds, sample_weight=masks, average='weighted')*100, 2)
@@ -441,7 +429,7 @@ def uni_train_or_eval_model(model, loss_function, dataloader, epoch, optimizer=N
 
 def make_cm(best_label, best_pred, best_mask, name_class, cm_name, folder="/cm"):
     #混同行列の作成
-    cm = confusion_matrix(best_label,best_pred,sample_weight=best_mask)
+    cm = confusion_matrix(best_label,best_pred)
 
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=name_class)
     disp.plot(cmap=plt.cm.Blues)
@@ -464,6 +452,14 @@ def make_cm(best_label, best_pred, best_mask, name_class, cm_name, folder="/cm")
     plt.tight_layout()  # レイアウト調整
 
     plt.savefig(output_folder+f'/{cm_name}.png')
+
+def for_merged_df(merged_df):
+    # all_prob列とmodal_flag列を安全にPythonリスト→numpy配列に変換
+    for col in ["all_prob_text", "all_prob_audio", "all_prob_visual", "modal_flag"]:
+        merged_df[col] = merged_df[col].apply(
+            lambda x: np.array(ast.literal_eval(x)) if isinstance(x, str) else np.array(x)
+        )
+    return merged_df
 
 
 if __name__ == '__main__':
@@ -584,7 +580,7 @@ if __name__ == '__main__':
                                                                     batch_size=batch_size,
                                                                     num_workers=0)
     elif args.Dataset == 'IEMOCAP':
-        loss_function = MaskedL2Loss()
+        loss_function = MaskedL2Loss_2()
         train_loader, valid_loader, test_loader = get_IEMOCAP_loaders(valid=0.0,
                                                                       batch_size=batch_size,
                                                                       num_workers=0, valid_num=args.valid_num)
@@ -674,7 +670,6 @@ if __name__ == '__main__':
     print('F-Score: {}'.format(max(all_fscore)))
     print('F-Score-index: {}'.format(all_fscore.index(max(all_fscore)) + 1))
 
-
     #各データセットのラベル名
     if args.Dataset=='IEMOCAP':
         name_class = ['happy', 'sad', 'neutral', 'angry', 'excited', 'frustrated']
@@ -689,10 +684,17 @@ if __name__ == '__main__':
             filtered_row = {key: row.get(key, "") for key in fieldnames2}
             writer.writerow(filtered_row)
         print("Saved all Pred examples to all_pred.csv")
+
+    # ===== CSV読み込み =====
+    df_ = pd.read_csv(args.out_path+"/all_pred.csv")
+
+    # ===== 予測値と真値を抽出 =====
+    y_pred = df_["pred"]
+    y_true = df_["true"]
     
     #分類精度結果
     # labels = list(range(len(name_class)))
-    report_dict = classification_report(best_label, best_pred,  sample_weight=best_mask, target_names=name_class, digits=4, output_dict=True)
+    report_dict = classification_report(y_true, y_pred, target_names=name_class, digits=4, output_dict=True)
     ##DataFrameに変換
     df_dict = pd.DataFrame(report_dict).transpose()
 
@@ -703,7 +705,7 @@ if __name__ == '__main__':
     df_dict.to_csv(args.out_path+'/classification_report.csv')
 
     #混同行列の作成
-    make_cm(best_label, best_pred, best_mask, name_class, "cm")
+    make_cm(y_true, y_pred, best_mask, name_class, "cm")
 
     #学習の記録
     show_history(history, args.out_path)
